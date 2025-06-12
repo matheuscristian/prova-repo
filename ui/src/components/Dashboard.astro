@@ -1,0 +1,121 @@
+---
+import { Plus } from "@lucide/astro";
+
+export interface Props {
+  baseUrl: string;
+  fields: string[];
+  title: string;
+}
+
+const { baseUrl, fields, title } = Astro.props;
+---
+
+<section id="dashboard" data-url={baseUrl} data-fields={JSON.stringify(fields)}>
+  <div data-name="dashboard-header">
+    <div>
+      <h1>
+        {title}
+      </h1>
+      <button id="add-row-btn"><Plus color="#000000" width={20} /></button>
+    </div>
+    <hr />
+  </div>
+  <div data-name="dashboard-body">
+    <table id="dashboard-table">
+      <thead>
+        <tr>
+          {fields.map((field) => <th>{field}</th>)}
+        </tr>
+      </thead>
+      <tbody id="dashboard-table-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  import Swal from "sweetalert2";
+
+  const dashboard = document.getElementById("dashboard") as HTMLElement;
+
+  const baseURL = dashboard.dataset.url as string;
+  const fields = JSON.parse(dashboard.dataset.fields!) as string[];
+
+  const tableBody = document.getElementById(
+    "dashboard-table-body",
+  ) as HTMLTableSectionElement;
+
+  function addRow(obj: Record<string, any>) {
+    const row = document.createElement("tr");
+
+    for (const field of Object.values(obj)) {
+      const col = document.createElement("td");
+      col.textContent = field;
+
+      row.appendChild(col);
+    }
+
+    tableBody.appendChild(row);
+  }
+
+  async function loadData() {
+    const res = await fetch(baseURL);
+
+    if (!res.ok) {
+      throw new Error(res.statusText);
+    }
+
+    const data = (await res.json()) as any[];
+
+    for (const obj of data) {
+      addRow(obj);
+    }
+  }
+
+  (
+    document.getElementById("add-row-btn") as HTMLButtonElement
+  ).addEventListener("click", async () => {
+    const swalResponse = await Swal.fire({
+      title: "Adicionar",
+      focusConfirm: false,
+      showCancelButton: true,
+      html: fields
+        .map(
+          (field) =>
+            field !== "id" && `<input type="text" id="input-${field}" />`,
+        )
+        .filter((v) => typeof v === "string")
+        .join("\n"),
+      preConfirm() {
+        const obj: Record<string, string> = {};
+
+        for (const field of fields) {
+          if (field === "id") continue;
+
+          obj[field] = (
+            document.getElementById(`input-${field}`) as HTMLInputElement
+          ).value;
+        }
+
+        return obj;
+      },
+    });
+
+    if (!swalResponse.isConfirmed) return;
+
+    if (!swalResponse.value) throw new Error("Missing input data!");
+
+    const res = await fetch(baseURL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(swalResponse.value),
+    });
+
+    if (!res.ok) throw new Error(res.statusText);
+
+    const data = await res.json();
+
+    addRow(data);
+  });
+
+  loadData();
+</script>

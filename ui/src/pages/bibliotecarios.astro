@@ -1,0 +1,8 @@
+---
+import Dashboard from "../components/Dashboard.astro";
+import MainLayout from "../layouts/MainLayout.astro";
+---
+
+<MainLayout>
+    <Dashboard baseUrl="http://localhost:8080/api/bibliotecarios" title="Bibliotecários" fields={["id", "nome", "email"]} />
+</MainLayout>

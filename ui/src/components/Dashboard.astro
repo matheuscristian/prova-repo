@@ -54,6 +54,25 @@ const { baseUrl, fields, title } = Astro.props;
       row.appendChild(col);
     }
 
+    const actionCol = document.createElement("td");
+
+    const editButton = document.createElement("button");
+    editButton.className = "edit-btn";
+    editButton.textContent = "Editar";
+
+    editButton.dataset.obj = JSON.stringify(obj);
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "delete-btn";
+    deleteButton.textContent = "Deletar";
+
+    deleteButton.dataset.objId = obj.id.toString();
+
+    actionCol.appendChild(editButton);
+    actionCol.appendChild(deleteButton);
+
+    row.appendChild(actionCol);
+
     tableBody.appendChild(row);
   }
 
@@ -115,6 +134,25 @@ const { baseUrl, fields, title } = Astro.props;
     const data = await res.json();
 
     addRow(data);
+  });
+
+  tableBody.addEventListener("click", async (e) => {
+    const target = e.target as HTMLElement;
+
+    const button = target.closest("button");
+    if (!button) return;
+
+    const row = button.closest("tr") as HTMLTableRowElement;
+
+    if (button.classList.contains("delete-btn")) {
+      const res = await fetch(`${baseURL}/${button.dataset.objId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error(res.statusText);
+
+      row.remove();
+    }
   });
 
   loadData();

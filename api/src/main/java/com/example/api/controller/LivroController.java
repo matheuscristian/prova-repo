@@ -39,10 +39,6 @@ public class LivroController extends AbstractController<LivroModel, Long> {
                         livro.setStatus(updated.getStatus());
                     }
 
-                    if (updated.getBibliotecario() != null) {
-                        livro.getBibliotecario().setId(updated.getBibliotecario().getId());
-                    }
-
                     return ResponseEntity.ok(repository.save(livro));
                 })
                 .orElse(ResponseEntity.notFound().build());

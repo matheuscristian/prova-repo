@@ -37,6 +37,7 @@ public class LivroModel {
     private String genero;
 
     @Size(max = 255)
+    @NotBlank
     private String status;
 
     @CreatedDate

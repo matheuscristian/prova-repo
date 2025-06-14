@@ -43,7 +43,6 @@ const { baseUrl, fields, title, ...other } = Astro.props;
 <script>
   import Swal from "sweetalert2";
   import { createElement as createIconElement, PenSquare, Trash } from "lucide";
-  import type { Options } from "astro:transitions/client";
 
   const dashboard = document.getElementById("dashboard") as HTMLElement;
 
@@ -85,7 +84,7 @@ const { baseUrl, fields, title, ...other } = Astro.props;
     actionCol.className = "space-x-1";
 
     const editButton = document.createElement("button");
-    editButton.className = "edit-btn !bg-yellow-400 active:!bg-yellow-500";
+    editButton.className = "edit-btn !bg-amber-400 active:!bg-amber-500";
 
     editButton.appendChild(createIconElement(PenSquare, { width: 17 }));
 
@@ -124,7 +123,10 @@ const { baseUrl, fields, title, ...other } = Astro.props;
     return data;
   }
 
-  async function promptFields(defaultObj: Record<string, any> = {}) {
+  async function promptFields(
+    title: string,
+    defaultObj: Record<string, any> = {},
+  ) {
     const neededData: Record<string, Record<string, any>[]> = {};
 
     for (const field of fields) {
@@ -134,7 +136,7 @@ const { baseUrl, fields, title, ...other } = Astro.props;
     }
 
     return Swal.fire({
-      title: "Adicionar",
+      title,
       focusConfirm: false,
       showCancelButton: true,
       html: `
@@ -220,7 +222,7 @@ const { baseUrl, fields, title, ...other } = Astro.props;
   (
     document.getElementById("add-row-btn") as HTMLButtonElement
   ).addEventListener("click", async () => {
-    const swalResponse = await promptFields();
+    const swalResponse = await promptFields("Adicionar");
 
     if (!swalResponse.isConfirmed) return;
 
@@ -307,7 +309,7 @@ const { baseUrl, fields, title, ...other } = Astro.props;
         defaultObj[field] = row.querySelector(`.field-${field}`)!.textContent;
       }
 
-      const swalResponse = await promptFields(defaultObj);
+      const swalResponse = await promptFields("Editar", defaultObj);
 
       if (!swalResponse.isConfirmed) return;
 

@@ -1,8 +1,9 @@
 package com.example.api.model;
 
-import java.sql.Date;
+import java.time.LocalDate;
 
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -13,6 +14,7 @@ import lombok.Setter;
 @Setter
 
 @Entity(name = "livro")
+@EntityListeners(AuditingEntityListener.class)
 public class LivroModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,5 +41,5 @@ public class LivroModel {
 
     @CreatedDate
     @Column(updatable = false)
-    private Date created_date;
+    private LocalDate created_date;
 }

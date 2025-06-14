@@ -1,22 +1,29 @@
 ---
 import { Plus } from "@lucide/astro";
 
-export interface Props {
+export interface Props extends Record<string, any> {
   baseUrl: string;
   fields: string[];
   title: string;
 }
 
-const { baseUrl, fields, title } = Astro.props;
+const { baseUrl, fields, title, ...other } = Astro.props;
 ---
 
-<section id="dashboard" data-url={baseUrl} data-fields={JSON.stringify(fields)}>
+<section
+  id="dashboard"
+  data-url={baseUrl}
+  data-fields={JSON.stringify(fields)}
+  data-other={JSON.stringify(other)}
+>
   <div data-name="dashboard-header">
-    <div>
+    <div class="flex justify-between">
       <h1>
         {title}
       </h1>
-      <button id="add-row-btn"><Plus color="#000000" width={20} /></button>
+      <button id="add-row-btn" class="!bg-transparent"
+        ><Plus color="#000000" width={20} /></button
+      >
     </div>
     <hr />
   </div>
@@ -24,7 +31,8 @@ const { baseUrl, fields, title } = Astro.props;
     <table id="dashboard-table">
       <thead>
         <tr>
-          {fields.map((field) => <th>{field}</th>)}
+          {fields.map((field) => <th>{field.split("__")[0]}</th>)}
+          <th>Ações</th>
         </tr>
       </thead>
       <tbody id="dashboard-table-body"></tbody>
@@ -34,37 +42,59 @@ const { baseUrl, fields, title } = Astro.props;
 
 <script>
   import Swal from "sweetalert2";
+  import { createElement as createIconElement, PenSquare, Trash } from "lucide";
+  import type { Options } from "astro:transitions/client";
 
   const dashboard = document.getElementById("dashboard") as HTMLElement;
 
   const baseURL = dashboard.dataset.url as string;
   const fields = JSON.parse(dashboard.dataset.fields!) as string[];
+  const otherProps = JSON.parse(dashboard.dataset.other!) as Record<
+    string,
+    Record<any, any> | undefined
+  >;
 
   const tableBody = document.getElementById(
     "dashboard-table-body",
   ) as HTMLTableSectionElement;
 
+  const gridTemplate = `0.2fr repeat(${fields.length - 1}, minmax(0px, 1fr)) 0.5fr`;
+
   function addRow(obj: Record<string, any>) {
     const row = document.createElement("tr");
 
-    for (const field of Object.values(obj)) {
+    row.style.gridTemplateColumns = gridTemplate;
+
+    for (const field of fields) {
       const col = document.createElement("td");
-      col.textContent = field;
+
+      if (field.includes("__")) {
+        const fieldArgs = field.split("__");
+
+        col.textContent = obj[fieldArgs[0]][fieldArgs[1]];
+      } else {
+        col.textContent = obj[field];
+      }
+
+      col.className = `field-${field}`;
 
       row.appendChild(col);
     }
 
     const actionCol = document.createElement("td");
+    actionCol.className = "space-x-1";
 
     const editButton = document.createElement("button");
-    editButton.className = "edit-btn";
-    editButton.textContent = "Editar";
+    editButton.className = "edit-btn !bg-yellow-400 active:!bg-yellow-500";
 
-    editButton.dataset.obj = JSON.stringify(obj);
+    editButton.appendChild(createIconElement(PenSquare, { width: 17 }));
+
+    editButton.dataset.objId = obj.id.toString();
 
     const deleteButton = document.createElement("button");
-    deleteButton.className = "delete-btn";
-    deleteButton.textContent = "Deletar";
+    deleteButton.className = "delete-btn !bg-red-500 active:!bg-red-600";
+
+    deleteButton.appendChild(createIconElement(Trash, { width: 17 }));
 
     deleteButton.dataset.objId = obj.id.toString();
 
@@ -74,6 +104,103 @@ const { baseUrl, fields, title } = Astro.props;
     row.appendChild(actionCol);
 
     tableBody.appendChild(row);
+  }
+
+  async function getObjectFromFieldArgs(field: string) {
+    const fieldArgs = field.split("__");
+
+    if (fieldArgs.length !== 2) {
+      return [];
+    }
+
+    const res = await fetch(`${otherProps[`${fieldArgs[0]}Url`]}`);
+
+    if (!res.ok) {
+      throw new Error(res.statusText);
+    }
+
+    const data = (await res.json()) as Record<string, any>[];
+
+    return data;
+  }
+
+  async function promptFields(defaultObj: Record<string, any> = {}) {
+    const neededData: Record<string, Record<string, any>[]> = {};
+
+    for (const field of fields) {
+      if (field.includes("__")) {
+        neededData[field] = await getObjectFromFieldArgs(field);
+      }
+    }
+
+    return Swal.fire({
+      title: "Adicionar",
+      focusConfirm: false,
+      showCancelButton: true,
+      html: `
+        <div class="w-2/3 mx-auto space-y-3">
+          ${fields
+            .map(
+              (field) =>
+                field !== "id" &&
+                `<div class="w-full flex flex-col items-start justify-center gap-1">
+                  <label>${field}</label>
+                  ${
+                    !field.includes("__")
+                      ? `<input type="text" id="input-${field}" ${!otherProps.noAlter?.includes(field) ? "value" : "readonly value"}="${defaultObj[field] ?? ""}" />`
+                      : `<select id="input-${field}">${
+                          otherProps.noAlter?.includes(field) &&
+                          defaultObj[field]
+                            ? `<option>${defaultObj[field]}</option>`
+                            : neededData[field].map(
+                                (v) =>
+                                  `<option value="${v.id}">${v[field.split("__")[1]]}</option>`,
+                              )
+                        }</select>`
+                  }
+                 </div>`,
+            )
+            .filter((v) => typeof v === "string")
+            .join("\n")}
+        </div>
+      `,
+      preConfirm() {
+        const obj: Record<string, any> = {};
+
+        for (const field of fields) {
+          if (
+            field === "id" ||
+            (otherProps.noAlter?.includes(field) && defaultObj[field])
+          )
+            continue;
+
+          if (field.includes("__")) {
+            const fieldArgs = field.split("__");
+
+            obj[fieldArgs[0]] = {
+              id: (
+                document.getElementById(`input-${field}`) as HTMLInputElement
+              ).value,
+              _content: neededData[field].find(
+                (v) =>
+                  v.id ==
+                  (
+                    document.getElementById(
+                      `input-${field}`,
+                    ) as HTMLInputElement
+                  ).value,
+              )![fieldArgs[1]],
+            };
+          } else {
+            obj[field] =
+              (document.getElementById(`input-${field}`) as HTMLInputElement)
+                .value || null;
+          }
+        }
+
+        return obj;
+      },
+    });
   }
 
   async function loadData() {
@@ -93,45 +220,53 @@ const { baseUrl, fields, title } = Astro.props;
   (
     document.getElementById("add-row-btn") as HTMLButtonElement
   ).addEventListener("click", async () => {
-    const swalResponse = await Swal.fire({
-      title: "Adicionar",
-      focusConfirm: false,
-      showCancelButton: true,
-      html: fields
-        .map(
-          (field) =>
-            field !== "id" && `<input type="text" id="input-${field}" />`,
-        )
-        .filter((v) => typeof v === "string")
-        .join("\n"),
-      preConfirm() {
-        const obj: Record<string, string> = {};
-
-        for (const field of fields) {
-          if (field === "id") continue;
-
-          obj[field] = (
-            document.getElementById(`input-${field}`) as HTMLInputElement
-          ).value;
-        }
-
-        return obj;
-      },
-    });
+    const swalResponse = await promptFields();
 
     if (!swalResponse.isConfirmed) return;
 
     if (!swalResponse.value) throw new Error("Missing input data!");
 
-    const res = await fetch(baseURL, {
+    let res = await fetch(baseURL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(swalResponse.value),
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
 
-    if (!res.ok) throw new Error(res.statusText);
+        return res;
+      })
+      .catch((err) => {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          title: "Erro",
+          text: "Não foi possível adicionar",
+          icon: "error",
+        });
+        throw err;
+      });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    res = await fetch(`${baseURL}/${data.id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+
+        return res;
+      })
+      .catch((err) => {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          title: "Erro",
+          text: "Não foi possível adicionar",
+          icon: "error",
+        });
+        throw err;
+      });
+
+    data = await res.json();
 
     addRow(data);
   });
@@ -145,15 +280,75 @@ const { baseUrl, fields, title } = Astro.props;
     const row = button.closest("tr") as HTMLTableRowElement;
 
     if (button.classList.contains("delete-btn")) {
-      const res = await fetch(`${baseURL}/${button.dataset.objId}`, {
+      fetch(`${baseURL}/${button.dataset.objId}`, {
         method: "DELETE",
-      });
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(res.statusText);
 
-      if (!res.ok) throw new Error(res.statusText);
+          row.remove();
+        })
+        .catch((err) => {
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            title: "Erro",
+            text: "Não foi possível excluír",
+            icon: "error",
+          });
+          throw err;
+        });
+    }
 
-      row.remove();
+    if (button.classList.contains("edit-btn")) {
+      const defaultObj: Record<string, any> = {};
+
+      for (const field of fields) {
+        defaultObj[field] = row.querySelector(`.field-${field}`)!.textContent;
+      }
+
+      const swalResponse = await promptFields(defaultObj);
+
+      if (!swalResponse.isConfirmed) return;
+
+      fetch(`${baseURL}/${button.dataset.objId!}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(swalResponse.value),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(res.statusText);
+
+          for (const field of fields) {
+            if (field === "id" || otherProps.noAlter?.includes(field)) continue;
+
+            if (field.includes("__")) {
+              const fieldArgs = field.split("__");
+
+              row.querySelector(`.field-${field}`)!.textContent =
+                swalResponse.value[fieldArgs[0]]["_content"];
+            } else {
+              row.querySelector(`.field-${field}`)!.textContent = swalResponse
+                .value[field] as any;
+            }
+          }
+        })
+        .catch((err) => {
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            title: "Erro",
+            text: "Não foi possível editar",
+            icon: "error",
+          });
+          throw err;
+        });
     }
   });
+
+  (
+    document.querySelector("thead tr") as HTMLElement
+  ).style.gridTemplateColumns = gridTemplate;
 
   loadData();
 </script>

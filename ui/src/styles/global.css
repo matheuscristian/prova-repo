@@ -1,1 +1,61 @@
 @import "tailwindcss";
+
+body {
+  @apply bg-[#eee] h-screen w-full flex flex-col items-center justify-start;
+}
+
+#dashboard {
+  @apply bg-white rounded-lg shadow-md w-full lg:w-2/3 p-5 h-screen lg:h-auto mt-26;
+
+  div[data-name="dashboard-header"] {
+    h1 {
+      @apply text-2xl;
+    }
+
+    hr {
+      @apply my-3 border-gray-700/20;
+    }
+  }
+
+  div[data-name="dashboard-body"] {
+    @apply xl:px-4 2xl:px-10;
+
+    table,
+    table > * {
+      @apply w-full;
+    }
+
+    thead tr,
+    tbody tr {
+      @apply grid w-full text-center mt-3;
+    }
+
+    tr > * {
+      @apply wrap-break-word;
+    }
+  }
+
+  button {
+    @apply py-2 px-3 bg-blue-300 rounded-md cursor-pointer transition-all duration-75;
+
+    &:disabled {
+      @apply cursor-not-allowed;
+    }
+
+    &:hover {
+      @apply scale-[102%];
+    }
+
+    &:active {
+      @apply scale-[97%] bg-blue-400;
+    }
+  }
+}
+
+input {
+  @apply w-full px-3 py-2 shadow-md border-1 border-gray-300 text-sm focus:outline-1 outline-gray-600;
+}
+
+label {
+  @apply uppercase;
+}
